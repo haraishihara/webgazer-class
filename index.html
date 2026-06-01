@@ -10,6 +10,13 @@
     window.saveDataAcrossSessions = false;
   </script>
   <script src="webgazer.js"></script>
+  <script>
+    // WebGazer 読み込み直後に MediaPipe の参照先を確定します（公式デモと同じ params を使用）。
+    if (window.webgazer?.params) {
+      window.webgazer.params.faceMeshSolutionPath = new URL("./mediapipe/face_mesh/", window.location.href).toString();
+      window.webgazer.params.saveDataAcrossSessions = false;
+    }
+  </script>
 </head>
 <body>
   <header id="toolbar" class="toolbar" aria-label="操作ツールバー">

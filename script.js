@@ -69,6 +69,20 @@ function setStatus(message) {
   statusText.textContent = message;
 }
 
+function updateStartGazeButtonState() {
+  if (!startGazeButton) return;
+  startGazeButton.disabled = isGazeStarting;
+  startGazeButton.textContent = isGazeStarting ? "起動中..." : "視線追跡開始";
+}
+
+function ensureHttpServing() {
+  if (window.location.protocol !== "file:") {
+    return true;
+  }
+  setStatus("file:// では動作しません。プロジェクトフォルダで python3 -m http.server 8000 を実行し、http://localhost:8000/ を開いてください。");
+  return false;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -161,7 +175,7 @@ function configureWebGazerMediaPipeAssets() {
 
 async function checkMediaPipeAssetsReachable() {
   try {
-    const response = await fetch(`${MEDIAPIPE_FACE_MESH_SOLUTION_PATH}/face_mesh.binarypb`, { method: "HEAD", mode: "cors" });
+    const response = await fetch(`${MEDIAPIPE_FACE_MESH_SOLUTION_PATH}face_mesh.binarypb`, { method: "HEAD" });
     return response.ok;
   } catch (error) {
     return false;
@@ -297,7 +311,7 @@ async function startGazeTracking() {
 
   if (isGazeStarting) {
     setStatus("WebGazerを起動中です。カメラ許可が出ている場合は許可してください。");
-    return true;
+    return false;
   }
 
   if (!window.webgazer) {
@@ -305,62 +319,53 @@ async function startGazeTracking() {
     return false;
   }
 
+  if (!ensureHttpServing()) {
+    return false;
+  }
+
+  isGazeStarting = true;
+  updateStartGazeButtonState();
+
   try {
-    isGazeStarting = true;
     configureWebGazerMediaPipeAssets();
     setStatus("WebGazerを起動中です。ブラウザからカメラ許可を求められたら許可してください。");
 
-    checkMediaPipeAssetsReachable().then((isReachable) => {
-      if (!isReachable && isGazeStarting) {
-        setStatus("MediaPipe FaceMeshの追加ファイルを読み込めません。ネットワーク接続、または mediapipe/face_mesh フォルダの配置を確認してください。");
-      }
-    });
+    const isReachable = await checkMediaPipeAssetsReachable();
+    if (!isReachable) {
+      setStatus("MediaPipe FaceMeshの追加ファイルを読み込めません。mediapipe/face_mesh フォルダの配置を確認してください。");
+      return false;
+    }
 
-    window.webgazer
+    // 公式デモ（https://webgazer.cs.brown.edu/）と同様に begin() の完了を待ちます。
+    // setTracker() は呼ばない（既定の TFFacemesh を使い、二重初期化を避ける）。
+    await window.webgazer
       .saveDataAcrossSessions(false)
       .setRegression("ridge")
-      .setTracker("TFFacemesh")
       .setGazeListener((data) => {
         if (!data) return;
         updateGaze(data.x, data.y);
-      });
+      })
+      .showVideoPreview(true)
+      .showFaceOverlay(true)
+      .showFaceFeedbackBox(true)
+      .showPredictionPoints(false)
+      .begin();
 
-    const beginResult = window.webgazer.begin(() => {
-      isGazeStarted = false;
-      isGazeStarting = false;
-      setStatus("カメラを開始できませんでした。ブラウザのカメラ許可とHTTPS設定を確認してください。");
-    });
-    window.webgazer.showVideoPreview(true);
-    window.webgazer.showFaceOverlay(true);
-    window.webgazer.showFaceFeedbackBox(true);
-    window.webgazer.showPredictionPoints(false);
     window.saveDataAcrossSessions = false;
-
-    // 一部のWebGazer.jsでは begin() のPromise解決が遅い/返らない場合があります。
-    // カメラが起動しているのにキャリブレーションが押せない状態を避けるため、
-    // begin() 呼び出し直後に開始済みとして扱います。
     isGazeStarted = true;
-    isGazeStarting = false;
     watchWebGazerPreviewPosition();
     startGazePredictionPolling();
+    positionWebGazerPreview();
     setStatus("視線追跡を開始しました。次に「9点キャリブレーション」を押すと精度を調整できます。");
-
-    Promise.resolve(beginResult).then(() => {
-      positionWebGazerPreview();
-    }).catch((error) => {
-      console.error(error);
-      isGazeStarted = false;
-      isGazeStarting = false;
-      setStatus("視線追跡を開始できませんでした。カメラ許可、HTTPS、ブラウザ設定を確認してください。");
-    });
-
     return true;
   } catch (error) {
     console.error(error);
     isGazeStarted = false;
-    isGazeStarting = false;
     setStatus("視線追跡を開始できませんでした。カメラ許可、HTTPS、ブラウザ設定を確認してください。");
     return false;
+  } finally {
+    isGazeStarting = false;
+    updateStartGazeButtonState();
   }
 }
 
@@ -536,7 +541,16 @@ sampleButtons.forEach((button) => {
 });
 
 // 初期状態を明示します。
+if (window.webgazer?.params) {
+  configureWebGazerMediaPipeAssets();
+}
 syncToolbarHeight();
 populateScreenshotOptions();
 showIntro();
+updateStartGazeButtonState();
 window.addEventListener("resize", syncToolbarHeight);
+window.addEventListener("beforeunload", () => {
+  if (window.webgazer?.end) {
+    window.webgazer.end();
+  }
+});

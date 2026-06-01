@@ -18,7 +18,7 @@ WebGazer.jsを使った授業用の簡易視線追跡Webアプリです。
 - `screenshots/` 内のPNG / JPG / JPEG / WebP / GIF画像（任意）
 
 > 注意: `webgazer.js` はCDNから読み込まず、`index.html` と同じフォルダに置いたローカルファイルを読み込みます。
-> WebGazer v3 の TFFaceMesh は `face_mesh.binarypb` や WASM などのMediaPipe追加ファイルも必要です。このアプリではバイナリをPRに含めないため、既定では `script.js` の `MEDIAPIPE_FACE_MESH_SOLUTION_PATH` で指定したCDNから追加ファイルを読み込みます。
+> WebGazer v3 の TFFaceMesh は `mediapipe/face_mesh/` 内の `face_mesh.binarypb` や WASM なども必要です（リポジトリに同梱済み）。
 
 ### GitHub Pagesで必要なWebGazer / MediaPipeファイル
 
@@ -29,26 +29,14 @@ index.html
 style.css
 script.js
 webgazer.js
+mediapipe/face_mesh/（FaceMesh 用バイナリ一式）
 screenshots/manifest.js
 screenshots/README.md
-mediapipe/face_mesh/README.md
 ```
 
-`face_mesh.binarypb` などの404が出る場合は、WebGazer本体ではなく MediaPipe FaceMesh の追加ファイルが見つかっていません。`https://github.com/tensorflow/tfjs-models/tree/master/facemesh` は現在の取得先ではありません。
+`face_mesh.binarypb` などが 404 の場合は、MediaPipe ファイルが見つかっていません。`mediapipe/face_mesh/README.md` を参照してください。
 
-既定では `script.js` の `MEDIAPIPE_FACE_MESH_SOLUTION_PATH` が次のCDNを指しています。
-
-```js
-const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619";
-```
-
-このCDNが学校やブラウザ環境で使える場合、追加ファイルの手動配置は不要です。CDNが使えない場合は、`mediapipe/face_mesh/README.md` に書かれたファイルを `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/<ファイル名>` からダウンロードし、`mediapipe/face_mesh/` に配置してから、`script.js` の定数を次のように変更してください。
-
-> 注意: `https://app.unpkg.com/...` のページを保存すると、JavaScriptではなくHTMLが保存されます。必ず `https://unpkg.com/...` の生ファイルURL（Raw）を使ってください。
-
-```js
-const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "./mediapipe/face_mesh";
-```
+ローカル確認では **必ず HTTP サーバー** を使ってください（`index.html` をダブルクリックして `file://` で開くと CORS エラーになります）。
 
 ### screenshotsフォルダの画像を使う
 
@@ -72,6 +60,8 @@ python3 -m http.server 8000
 ```
 
 その後、ブラウザで `http://localhost:8000/` を開きます。カメラ利用のため、公開時はHTTPS上で使うことを推奨します。
+
+視線追跡の起動は [WebGazer.js 公式](https://webgazer.cs.brown.edu/) と同様に `webgazer.begin()` の完了を待ってから行います。
 
 ## プライバシー
 
