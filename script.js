@@ -1,6 +1,7 @@
 // ===== 授業中に調整しやすい主要設定 =====
 const TRAIL_INTERVAL_MS = 180;
-const GAZE_POLL_INTERVAL_MS = 120;
+// WebGazer 公式の赤い点と同じく、直近 N フレームの移動平均で表示を滑らかにします。
+const GAZE_SMOOTHING_WINDOW_SIZE = 4;
 const WEBGAZER_PREVIEW_WIDTH = 320;
 const WEBGAZER_PREVIEW_HEIGHT = 240;
 // WebGazer v3 の TFFaceMesh は MediaPipe の追加ファイルを必要とします。
@@ -43,8 +44,6 @@ const displayArea = document.getElementById("displayArea");
 const pageFrame = document.getElementById("pageFrame");
 const droppedImage = document.getElementById("droppedImage");
 const introPanel = document.getElementById("introPanel");
-const embedNotice = document.getElementById("embedNotice");
-const closeEmbedNoticeButton = document.getElementById("closeEmbedNoticeButton");
 const gazeCursor = document.getElementById("gazeCursor");
 const trailLayer = document.getElementById("trailLayer");
 const calibrationLayer = document.getElementById("calibrationLayer");
@@ -61,8 +60,7 @@ let calibrationIndex = 0;
 let calibrationClickCount = 0;
 let droppedImageUrl = null;
 let webgazerPreviewPositionTimer = null;
-let gazePredictionPollTimer = null;
-let isEmbedNoticeDismissed = sessionStorage.getItem("embedNoticeDismissed") === "1";
+const gazeSampleBuffer = [];
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -139,23 +137,28 @@ function watchWebGazerPreviewPosition() {
   webgazerPreviewPositionTimer = setInterval(positionWebGazerPreview, 500);
 }
 
-function startGazePredictionPolling() {
-  if (gazePredictionPollTimer) {
-    clearInterval(gazePredictionPollTimer);
+function resetGazeSmoothing() {
+  gazeSampleBuffer.length = 0;
+}
+
+function pushGazeSample(x, y) {
+  gazeSampleBuffer.push({ x, y });
+  if (gazeSampleBuffer.length > GAZE_SMOOTHING_WINDOW_SIZE) {
+    gazeSampleBuffer.shift();
   }
+}
 
-  gazePredictionPollTimer = setInterval(async () => {
-    if (!window.webgazer?.getCurrentPrediction) return;
+function getSmoothedGaze() {
+  if (gazeSampleBuffer.length === 0) return null;
 
-    try {
-      const prediction = await window.webgazer.getCurrentPrediction();
-      if (prediction) {
-        updateGaze(prediction.x, prediction.y);
-      }
-    } catch (error) {
-      // 初期化直後や顔が検出されない瞬間は予測が失敗することがあるため、次回に再試行します。
-    }
-  }, GAZE_POLL_INTERVAL_MS);
+  let sumX = 0;
+  let sumY = 0;
+  for (const sample of gazeSampleBuffer) {
+    sumX += sample.x;
+    sumY += sample.y;
+  }
+  const count = gazeSampleBuffer.length;
+  return { x: sumX / count, y: sumY / count };
 }
 
 function configureWebGazerMediaPipeAssets() {
@@ -181,22 +184,6 @@ async function checkMediaPipeAssetsReachable() {
   }
 }
 
-function hideEmbedNotice() {
-  if (!embedNotice) return;
-  embedNotice.hidden = true;
-}
-
-function dismissEmbedNotice() {
-  isEmbedNoticeDismissed = true;
-  sessionStorage.setItem("embedNoticeDismissed", "1");
-  hideEmbedNotice();
-}
-
-function showEmbedNoticeIfAllowed() {
-  if (!embedNotice || isEmbedNoticeDismissed) return;
-  embedNotice.hidden = false;
-}
-
 function normalizeUrl(rawUrl) {
   const trimmedUrl = rawUrl.trim();
   if (!trimmedUrl) return "";
@@ -208,7 +195,6 @@ function showIntro() {
   introPanel.hidden = false;
   pageFrame.hidden = true;
   droppedImage.hidden = true;
-  hideEmbedNotice();
   pageFrame.removeAttribute("src");
   droppedImage.removeAttribute("src");
 
@@ -220,7 +206,6 @@ function showIframe(url) {
   droppedImage.hidden = true;
   pageFrame.hidden = false;
   pageFrame.src = url;
-  showEmbedNoticeIfAllowed();
 
   clearDroppedImageObjectUrl();
 }
@@ -238,7 +223,6 @@ function showImageSource(src, altText) {
   droppedImage.hidden = false;
   pageFrame.hidden = true;
   introPanel.hidden = true;
-  hideEmbedNotice();
   pageFrame.removeAttribute("src");
 }
 
@@ -309,9 +293,9 @@ async function startGazeTracking() {
       .begin();
 
     window.saveDataAcrossSessions = false;
+    resetGazeSmoothing();
     isGazeStarted = true;
     watchWebGazerPreviewPosition();
-    startGazePredictionPolling();
     positionWebGazerPreview();
     setStatus("視線追跡を開始しました。次に「9点キャリブレーション」を押すと精度を調整できます。");
     return true;
@@ -327,13 +311,25 @@ async function startGazeTracking() {
 }
 
 function updateGaze(x, y) {
-  latestGaze = { x, y };
-  gazeCursor.style.transform = `translate(${x}px, ${y}px)`;
+  pushGazeSample(x, y);
+  const smoothed = getSmoothedGaze();
+  if (!smoothed) return;
+
+  let displayX = smoothed.x;
+  let displayY = smoothed.y;
+  if (window.webgazer?.util?.bound) {
+    const bounded = window.webgazer.util.bound({ x: displayX, y: displayY });
+    displayX = bounded.x;
+    displayY = bounded.y;
+  }
+
+  latestGaze = { x: displayX, y: displayY };
+  gazeCursor.style.transform = `translate(${displayX}px, ${displayY}px)`;
   gazeCursor.classList.add("visible");
 
   const now = Date.now();
   if (now - lastTrailTime >= TRAIL_INTERVAL_MS) {
-    addTrailDot(x, y);
+    addTrailDot(displayX, displayY);
     lastTrailTime = now;
   }
 }
@@ -466,8 +462,6 @@ function handleDrop(event) {
 droppedImage.addEventListener("error", () => {
   setStatus("画像を読み込めませんでした。ドロップした画像ファイルを確認してください。");
 });
-
-closeEmbedNoticeButton?.addEventListener("click", dismissEmbedNotice);
 
 openPageButton.addEventListener("click", openPageFromInput);
 urlInput.addEventListener("keydown", (event) => {
