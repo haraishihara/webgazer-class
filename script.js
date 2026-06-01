@@ -1,5 +1,8 @@
 // ===== 授業中に調整しやすい主要設定 =====
 const TRAIL_INTERVAL_MS = 180;
+const GAZE_POLL_INTERVAL_MS = 120;
+const WEBGAZER_PREVIEW_WIDTH = 320;
+const WEBGAZER_PREVIEW_HEIGHT = 240;
 const MAX_TRAIL_POINTS = 300;
 const CALIBRATION_CLICKS_PER_POINT = 3;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -50,6 +53,7 @@ let calibrationIndex = 0;
 let calibrationClickCount = 0;
 let droppedImageUrl = null;
 let webgazerPreviewPositionTimer = null;
+let gazePredictionPollTimer = null;
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -67,16 +71,40 @@ function syncToolbarHeight() {
 }
 
 function positionWebGazerPreview() {
-  // WebGazer が後から挿入するカメラ映像・顔検出枠はinline styleを持つため、JSでも位置を補正します。
+  // WebGazerのDOM構造では、映像・顔ランドマーク・顔位置判定枠は
+  // webgazerVideoContainer の内側で絶対配置されます。子要素をfixedにすると、
+  // 顔位置判定枠の計算が壊れて緑色にならないため、移動するのは親コンテナだけにします。
   const top = `${Math.ceil(toolbar.getBoundingClientRect().height) + 16}px`;
-  ["webgazerVideoFeed", "webgazerVideoCanvas", "webgazerFaceOverlay", "webgazerFaceFeedbackBox"].forEach((id) => {
+  const container = document.getElementById("webgazerVideoContainer");
+  if (!container) return;
+
+  container.style.position = "fixed";
+  container.style.top = top;
+  container.style.left = "16px";
+  container.style.width = `${WEBGAZER_PREVIEW_WIDTH}px`;
+  container.style.height = `${WEBGAZER_PREVIEW_HEIGHT}px`;
+  container.style.zIndex = "1500";
+
+  ["webgazerVideoFeed", "webgazerFaceOverlay"].forEach((id) => {
     const element = document.getElementById(id);
     if (!element) return;
-    element.style.position = "fixed";
-    element.style.top = top;
-    element.style.left = "16px";
-    element.style.zIndex = "1500";
+    element.style.position = "absolute";
+    element.style.top = "0";
+    element.style.left = "0";
   });
+
+  const feedbackBox = document.getElementById("webgazerFaceFeedbackBox");
+  if (feedbackBox) {
+    feedbackBox.style.position = "absolute";
+  }
+
+  if (window.webgazer?.setVideoViewerSize && document.getElementById("webgazerVideoFeed")) {
+    try {
+      window.webgazer.setVideoViewerSize(WEBGAZER_PREVIEW_WIDTH, WEBGAZER_PREVIEW_HEIGHT);
+    } catch (error) {
+      // WebGazerの初期化前は内部video要素が未作成のため失敗することがあります。
+    }
+  }
 }
 
 function watchWebGazerPreviewPosition() {
@@ -86,6 +114,25 @@ function watchWebGazerPreviewPosition() {
 
   positionWebGazerPreview();
   webgazerPreviewPositionTimer = setInterval(positionWebGazerPreview, 500);
+}
+
+function startGazePredictionPolling() {
+  if (gazePredictionPollTimer) {
+    clearInterval(gazePredictionPollTimer);
+  }
+
+  gazePredictionPollTimer = setInterval(async () => {
+    if (!window.webgazer?.getCurrentPrediction) return;
+
+    try {
+      const prediction = await window.webgazer.getCurrentPrediction();
+      if (prediction) {
+        updateGaze(prediction.x, prediction.y);
+      }
+    } catch (error) {
+      // 初期化直後や顔が検出されない瞬間は予測が失敗することがあるため、次回に再試行します。
+    }
+  }, GAZE_POLL_INTERVAL_MS);
 }
 
 function isAcceptedScreenshotPath(src) {
@@ -230,6 +277,7 @@ async function startGazeTracking() {
     setStatus("WebGazerを起動中です。ブラウザからカメラ許可を求められたら許可してください。");
 
     window.webgazer
+      .saveDataAcrossSessions(false)
       .setRegression("ridge")
       .setTracker("TFFacemesh")
       .setGazeListener((data) => {
@@ -243,6 +291,8 @@ async function startGazeTracking() {
       setStatus("カメラを開始できませんでした。ブラウザのカメラ許可とHTTPS設定を確認してください。");
     });
     window.webgazer.showVideoPreview(true);
+    window.webgazer.showFaceOverlay(true);
+    window.webgazer.showFaceFeedbackBox(true);
     window.webgazer.showPredictionPoints(false);
     window.saveDataAcrossSessions = false;
 
@@ -252,6 +302,7 @@ async function startGazeTracking() {
     isGazeStarted = true;
     isGazeStarting = false;
     watchWebGazerPreviewPosition();
+    startGazePredictionPolling();
     setStatus("視線追跡を開始しました。次に「9点キャリブレーション」を押すと精度を調整できます。");
 
     Promise.resolve(beginResult).then(() => {
