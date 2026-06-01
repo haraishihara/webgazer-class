@@ -3,6 +3,9 @@ const TRAIL_INTERVAL_MS = 180;
 const GAZE_POLL_INTERVAL_MS = 120;
 const WEBGAZER_PREVIEW_WIDTH = 320;
 const WEBGAZER_PREVIEW_HEIGHT = 240;
+// WebGazer v3 の TFFaceMesh は MediaPipe の追加ファイルを必要とします。
+// バイナリファイルをPRに含めないため、既定ではCDNから読み込みます。
+const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619";
 const MAX_TRAIL_POINTS = 300;
 const CALIBRATION_CLICKS_PER_POINT = 3;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -133,6 +136,29 @@ function startGazePredictionPolling() {
       // 初期化直後や顔が検出されない瞬間は予測が失敗することがあるため、次回に再試行します。
     }
   }, GAZE_POLL_INTERVAL_MS);
+}
+
+function configureWebGazerMediaPipeAssets() {
+  if (!window.webgazer?.params) return;
+
+  // WebGazer v3 の params.faceMeshSolutionPath 既定値は ./mediapipe/face_mesh です。
+  // GitHubのPRでは face_mesh.binarypb / wasm などのバイナリを同梱しないため、
+  // MediaPipe公式npm配布物をCDNから読むように上書きします。
+  window.webgazer.params.faceMeshSolutionPath = MEDIAPIPE_FACE_MESH_SOLUTION_PATH;
+  window.webgazer.params.showVideoPreview = true;
+  window.webgazer.params.showFaceOverlay = true;
+  window.webgazer.params.showFaceFeedbackBox = true;
+  window.webgazer.params.videoViewerWidth = WEBGAZER_PREVIEW_WIDTH;
+  window.webgazer.params.videoViewerHeight = WEBGAZER_PREVIEW_HEIGHT;
+}
+
+async function checkMediaPipeAssetsReachable() {
+  try {
+    const response = await fetch(`${MEDIAPIPE_FACE_MESH_SOLUTION_PATH}/face_mesh.binarypb`, { method: "HEAD", mode: "cors" });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
 }
 
 function isAcceptedScreenshotPath(src) {
@@ -274,7 +300,14 @@ async function startGazeTracking() {
 
   try {
     isGazeStarting = true;
+    configureWebGazerMediaPipeAssets();
     setStatus("WebGazerを起動中です。ブラウザからカメラ許可を求められたら許可してください。");
+
+    checkMediaPipeAssetsReachable().then((isReachable) => {
+      if (!isReachable && isGazeStarting) {
+        setStatus("MediaPipe FaceMeshの追加ファイルを読み込めません。ネットワーク接続、または mediapipe/face_mesh フォルダの配置を確認してください。");
+      }
+    });
 
     window.webgazer
       .saveDataAcrossSessions(false)
