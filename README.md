@@ -42,7 +42,9 @@ mediapipe/face_mesh/README.md
 const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619";
 ```
 
-このCDNが学校やブラウザ環境で使える場合、追加ファイルの手動配置は不要です。CDNが使えない場合は、`mediapipe/face_mesh/README.md` に書かれたファイルを `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/` からダウンロードし、`mediapipe/face_mesh/` に配置してから、`script.js` の定数を次のように変更してください。
+このCDNが学校やブラウザ環境で使える場合、追加ファイルの手動配置は不要です。CDNが使えない場合は、`mediapipe/face_mesh/README.md` に書かれたファイルを `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/<ファイル名>` からダウンロードし、`mediapipe/face_mesh/` に配置してから、`script.js` の定数を次のように変更してください。
+
+> 注意: `https://app.unpkg.com/...` のページを保存すると、JavaScriptではなくHTMLが保存されます。必ず `https://unpkg.com/...` の生ファイルURL（Raw）を使ってください。
 
 ```js
 const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "./mediapipe/face_mesh";
