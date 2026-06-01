@@ -12,7 +12,7 @@
   <script src="webgazer.js"></script>
 </head>
 <body>
-  <header class="toolbar" aria-label="操作ツールバー">
+  <header id="toolbar" class="toolbar" aria-label="操作ツールバー">
     <div class="toolbar-row toolbar-row-main">
       <label class="url-label" for="urlInput">URL</label>
       <input id="urlInput" class="url-input" type="text" value="https://example.com" placeholder="https://example.com" autocomplete="off">
@@ -23,10 +23,19 @@
       <button id="clearBackgroundButton" type="button">背景をクリア</button>
     </div>
     <div class="toolbar-row toolbar-row-sub">
-      <div class="sample-buttons" aria-label="サンプルページ">
-        <span>サンプル:</span>
-        <button class="sample-button" type="button" data-url="https://example.com">Example</button>
-        <button class="sample-button" type="button" data-url="https://www.wikipedia.org/">Wikipedia</button>
+      <div class="toolbar-tools">
+        <div class="sample-buttons" aria-label="サンプルページ">
+          <span>サンプル:</span>
+          <button class="sample-button" type="button" data-url="https://example.com">Example</button>
+          <button class="sample-button" type="button" data-url="https://www.wikipedia.org/">Wikipedia</button>
+        </div>
+        <div class="screenshot-picker" aria-label="スクリーンショット画像選択">
+          <label for="screenshotSelect">画像:</label>
+          <select id="screenshotSelect" class="screenshot-select">
+            <option value="">screenshots/manifest.js に画像を登録</option>
+          </select>
+          <button id="openScreenshotButton" class="secondary-button" type="button">画像を表示</button>
+        </div>
       </div>
       <p id="statusText" class="status-text" role="status" aria-live="polite">準備完了です。まず「視線追跡開始」を押してください。</p>
     </div>
@@ -41,12 +50,12 @@
       <ol>
         <li>「視線追跡開始」を押して、カメラを許可してください。</li>
         <li>「9点キャリブレーション」を押して、青い点を見ながらクリックしてください。</li>
-        <li>URLを入力してWebページを開くか、画像をドラッグ＆ドロップしてください。</li>
+        <li>URLを入力してWebページを開くか、登録済み画像を選ぶか、画像をドラッグ＆ドロップしてください。</li>
         <li>赤い丸と赤い軌跡が、自分の視線の推定位置です。</li>
       </ol>
       <p>※これは授業用の簡易デモです。研究用アイトラッカーほど正確ではありません。</p>
       <p>※視線＝注意、視線＝操作意図とは限らない点も観察してみましょう。</p>
-      <p class="drop-hint">PNG / JPG / JPEG / WebP / GIF 画像をこの領域にドラッグ＆ドロップできます。</p>
+      <p class="drop-hint">PNG / JPG / JPEG / WebP / GIF 画像をこの領域にドラッグ＆ドロップできます。<br>また、<code>screenshots</code> フォルダに登録した画像は、上部の「画像」メニューから選択できます。</p>
       <p class="setup-note">配布時は、この <code>index.html</code> と同じフォルダに、別途用意した <code>webgazer.js</code> を置いてください。</p>
       <p class="privacy-note">カメラ映像はWebGazerによるブラウザ内処理に使用されます。<br>この授業用ページでは、視線データやカメラ映像をサーバーに送信・保存しません。</p>
     </section>
@@ -75,6 +84,7 @@
     埋め込み表示できないWebページは、スクリーンショット画像をドラッグ＆ドロップしてください。
   </footer>
 
+  <script src="screenshots/manifest.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

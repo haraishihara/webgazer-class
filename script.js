@@ -3,6 +3,7 @@ const TRAIL_INTERVAL_MS = 180;
 const MAX_TRAIL_POINTS = 300;
 const CALIBRATION_CLICKS_PER_POINT = 1;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const ACCEPTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 const CALIBRATION_POSITIONS = [
   { x: 10, y: 10, label: "左上" },
   { x: 50, y: 10, label: "上中央" },
@@ -15,15 +16,18 @@ const CALIBRATION_POSITIONS = [
   { x: 90, y: 90, label: "右下" },
 ];
 
-// WebGazer の永続保存を無効化します（index.html 側でも CDN 読み込み前に指定しています）。
+// WebGazer の永続保存を無効化します（index.html 側でもローカル版読み込み前に指定しています）。
 window.saveDataAcrossSessions = false;
 
+const toolbar = document.getElementById("toolbar");
 const urlInput = document.getElementById("urlInput");
 const openPageButton = document.getElementById("openPageButton");
 const startGazeButton = document.getElementById("startGazeButton");
 const calibrationButton = document.getElementById("calibrationButton");
 const clearTrailButton = document.getElementById("clearTrailButton");
 const clearBackgroundButton = document.getElementById("clearBackgroundButton");
+const screenshotSelect = document.getElementById("screenshotSelect");
+const openScreenshotButton = document.getElementById("openScreenshotButton");
 const statusText = document.getElementById("statusText");
 const displayArea = document.getElementById("displayArea");
 const pageFrame = document.getElementById("pageFrame");
@@ -44,9 +48,92 @@ let trailDots = [];
 let calibrationIndex = 0;
 let calibrationClickCount = 0;
 let droppedImageUrl = null;
+let webgazerPreviewPositionTimer = null;
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function syncToolbarHeight() {
+  // ツールバーは画面幅によって折り返すため、実際の高さをCSS変数へ反映します。
+  const toolbarHeight = Math.ceil(toolbar.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--toolbar-height", `${toolbarHeight}px`);
+  positionWebGazerPreview();
+}
+
+function positionWebGazerPreview() {
+  // WebGazer が後から挿入するカメラ映像・顔検出枠はinline styleを持つため、JSでも位置を補正します。
+  const top = `${Math.ceil(toolbar.getBoundingClientRect().height) + 16}px`;
+  ["webgazerVideoFeed", "webgazerVideoCanvas", "webgazerFaceOverlay", "webgazerFaceFeedbackBox"].forEach((id) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.style.position = "fixed";
+    element.style.top = top;
+    element.style.left = "16px";
+    element.style.zIndex = "1500";
+  });
+}
+
+function watchWebGazerPreviewPosition() {
+  if (webgazerPreviewPositionTimer) {
+    clearInterval(webgazerPreviewPositionTimer);
+  }
+
+  positionWebGazerPreview();
+  webgazerPreviewPositionTimer = setInterval(positionWebGazerPreview, 500);
+}
+
+function isAcceptedScreenshotPath(src) {
+  const lowerSrc = src.toLowerCase().split(/[?#]/)[0];
+  return ACCEPTED_IMAGE_EXTENSIONS.some((extension) => lowerSrc.endsWith(extension));
+}
+
+function getScreenshotEntries() {
+  if (!Array.isArray(window.SCREENSHOT_IMAGES)) return [];
+
+  return window.SCREENSHOT_IMAGES
+    .map((entry) => {
+      if (typeof entry === "string") {
+        return { label: entry.replace(/^screenshots\//, ""), src: entry };
+      }
+      return entry;
+    })
+    .filter((entry) => entry?.src && isAcceptedScreenshotPath(entry.src));
+}
+
+function populateScreenshotOptions() {
+  const screenshotEntries = getScreenshotEntries();
+  screenshotSelect.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = screenshotEntries.length
+    ? "画像を選択してください"
+    : "screenshots/manifest.js に画像を登録";
+  screenshotSelect.appendChild(placeholderOption);
+
+  screenshotEntries.forEach((entry) => {
+    const option = document.createElement("option");
+    option.value = entry.src;
+    option.textContent = entry.label || entry.src.replace(/^screenshots\//, "");
+    screenshotSelect.appendChild(option);
+  });
+
+  const isEmpty = screenshotEntries.length === 0;
+  screenshotSelect.disabled = isEmpty;
+  openScreenshotButton.disabled = isEmpty;
+}
+
+function openSelectedScreenshot() {
+  const selectedOption = screenshotSelect.selectedOptions[0];
+  const src = selectedOption?.value;
+  if (!src) {
+    setStatus("screenshots フォルダの画像を使うには、screenshots/manifest.js に画像を登録してください。");
+    return;
+  }
+
+  showScreenshotImage(src, selectedOption.textContent);
+  setStatus("登録済み画像を表示しました。視線カーソルと軌跡を重ねて観察できます。");
 }
 
 function normalizeUrl(rawUrl) {
@@ -64,10 +151,7 @@ function showIntro() {
   pageFrame.removeAttribute("src");
   droppedImage.removeAttribute("src");
 
-  if (droppedImageUrl) {
-    URL.revokeObjectURL(droppedImageUrl);
-    droppedImageUrl = null;
-  }
+  clearDroppedImageObjectUrl();
 }
 
 function showIframe(url) {
@@ -77,24 +161,35 @@ function showIframe(url) {
   embedNotice.hidden = false;
   pageFrame.src = url;
 
+  clearDroppedImageObjectUrl();
+}
+
+function clearDroppedImageObjectUrl() {
   if (droppedImageUrl) {
     URL.revokeObjectURL(droppedImageUrl);
     droppedImageUrl = null;
   }
 }
 
-function showImage(file) {
-  if (droppedImageUrl) {
-    URL.revokeObjectURL(droppedImageUrl);
-  }
-
-  droppedImageUrl = URL.createObjectURL(file);
-  droppedImage.src = droppedImageUrl;
+function showImageSource(src, altText) {
+  droppedImage.src = src;
+  droppedImage.alt = altText;
   droppedImage.hidden = false;
   pageFrame.hidden = true;
   introPanel.hidden = true;
   embedNotice.hidden = true;
   pageFrame.removeAttribute("src");
+}
+
+function showImage(file) {
+  clearDroppedImageObjectUrl();
+  droppedImageUrl = URL.createObjectURL(file);
+  showImageSource(droppedImageUrl, file.name || "ドラッグ＆ドロップされた画像");
+}
+
+function showScreenshotImage(src, label) {
+  clearDroppedImageObjectUrl();
+  showImageSource(src, label || "登録済みスクリーンショット画像");
 }
 
 function openPageFromInput() {
@@ -131,15 +226,28 @@ async function startGazeTracking() {
         updateGaze(data.x, data.y);
       });
 
-    await window.webgazer.begin();
+    const beginResult = window.webgazer.begin();
     window.webgazer.showVideoPreview(true);
     window.webgazer.showPredictionPoints(false);
     window.saveDataAcrossSessions = false;
 
+    // 一部のWebGazer.jsでは begin() のPromise解決が遅い/返らない場合があります。
+    // カメラが起動しているのにキャリブレーションが押せない状態を避けるため、
+    // begin() 呼び出し直後に開始済みとして扱います。
     isGazeStarted = true;
+    watchWebGazerPreviewPosition();
     setStatus("視線追跡を開始しました。次に「9点キャリブレーション」を押すと精度を調整できます。");
+
+    Promise.resolve(beginResult).then(() => {
+      positionWebGazerPreview();
+    }).catch((error) => {
+      console.error(error);
+      isGazeStarted = false;
+      setStatus("視線追跡を開始できませんでした。カメラ許可、HTTPS、ブラウザ設定を確認してください。");
+    });
   } catch (error) {
     console.error(error);
+    isGazeStarted = false;
     setStatus("視線追跡を開始できませんでした。カメラ許可、HTTPS、ブラウザ設定を確認してください。");
   }
 }
@@ -256,6 +364,10 @@ function handleDrop(event) {
   setStatus("画像を表示しました。画像の上に視線カーソルと軌跡が重なって表示されます。");
 }
 
+droppedImage.addEventListener("error", () => {
+  setStatus("画像を読み込めませんでした。screenshots/manifest.js のパス、またはドロップした画像ファイルを確認してください。");
+});
+
 openPageButton.addEventListener("click", openPageFromInput);
 urlInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") openPageFromInput();
@@ -263,6 +375,10 @@ urlInput.addEventListener("keydown", (event) => {
 startGazeButton.addEventListener("click", startGazeTracking);
 calibrationButton.addEventListener("click", startCalibration);
 clearTrailButton.addEventListener("click", clearTrail);
+openScreenshotButton.addEventListener("click", openSelectedScreenshot);
+screenshotSelect.addEventListener("change", () => {
+  if (screenshotSelect.value) openSelectedScreenshot();
+});
 clearBackgroundButton.addEventListener("click", () => {
   showIntro();
   setStatus("背景をクリアしました。URLを開くか、画像をドラッグ＆ドロップしてください。");
@@ -282,4 +398,7 @@ sampleButtons.forEach((button) => {
 });
 
 // 初期状態を明示します。
+syncToolbarHeight();
+populateScreenshotOptions();
 showIntro();
+window.addEventListener("resize", syncToolbarHeight);

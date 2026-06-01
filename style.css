@@ -1,5 +1,7 @@
 :root {
+  --toolbar-min-height: 112px;
   --toolbar-height: 112px;
+  --webgazer-preview-offset: 16px;
   --footer-height: 52px;
   --accent: #0f62fe;
   --danger: #e31b23;
@@ -21,7 +23,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -37,12 +40,18 @@ button {
   box-shadow: 0 2px 8px rgba(15, 98, 254, 0.22);
 }
 
-button:hover,
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:hover:not(:disabled),
 button:focus-visible {
   filter: brightness(1.06);
 }
 
-button:active {
+button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
@@ -50,7 +59,7 @@ button:active {
   position: fixed;
   inset: 0 0 auto 0;
   z-index: 1000;
-  min-height: var(--toolbar-height);
+  min-height: var(--toolbar-min-height);
   padding: 12px 16px;
   background: rgba(17, 24, 39, 0.96);
   color: #fff;
@@ -93,6 +102,14 @@ button:active {
   outline: none;
 }
 
+
+.toolbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+}
+
 .sample-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -110,6 +127,38 @@ button:active {
   box-shadow: none;
 }
 
+
+.screenshot-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #d1d5db;
+  font-size: 0.92rem;
+}
+
+.screenshot-picker label {
+  font-weight: 700;
+}
+
+.screenshot-select {
+  min-height: 34px;
+  max-width: min(360px, 70vw);
+  padding: 0.35rem 0.55rem;
+  border: 0;
+  border-radius: 8px;
+  color: #111827;
+  background: #fff;
+}
+
+.secondary-button {
+  min-height: 34px;
+  padding: 0.35rem 0.72rem;
+  background: #475569;
+  font-size: 0.88rem;
+  box-shadow: none;
+}
+
 .status-text {
   min-width: 280px;
   max-width: 720px;
@@ -118,6 +167,17 @@ button:active {
   font-size: 0.95rem;
   line-height: 1.45;
   text-align: right;
+}
+
+/* WebGazer が生成するカメラプレビューを、固定ヘッダーの下に見えるように調整します。 */
+#webgazerVideoFeed,
+#webgazerVideoCanvas,
+#webgazerFaceOverlay,
+#webgazerFaceFeedbackBox {
+  position: fixed !important;
+  top: calc(var(--toolbar-height) + var(--webgazer-preview-offset)) !important;
+  left: 16px !important;
+  z-index: 1500 !important;
 }
 
 .display-area {
@@ -281,7 +341,7 @@ button:active {
 
 .calibration-message {
   position: fixed;
-  top: 126px;
+  top: calc(var(--toolbar-height) + 16px);
   left: 50%;
   transform: translateX(-50%);
   padding: 12px 20px;
@@ -322,6 +382,7 @@ button:active {
 
 @media (max-width: 900px) {
   :root {
+    --toolbar-min-height: 184px;
     --toolbar-height: 184px;
     --footer-height: 70px;
   }
@@ -333,6 +394,7 @@ button:active {
   .toolbar-row-sub {
     display: block;
   }
+
 
   .status-text {
     margin-top: 8px;
