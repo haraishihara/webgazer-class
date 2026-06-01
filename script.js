@@ -1,7 +1,7 @@
 // ===== 授業中に調整しやすい主要設定 =====
 const TRAIL_INTERVAL_MS = 180;
 const MAX_TRAIL_POINTS = 300;
-const CALIBRATION_CLICKS_PER_POINT = 1;
+const CALIBRATION_CLICKS_PER_POINT = 3;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const ACCEPTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 const CALIBRATION_POSITIONS = [
@@ -42,6 +42,7 @@ const calibrationProgress = document.getElementById("calibrationProgress");
 const sampleButtons = document.querySelectorAll(".sample-button");
 
 let isGazeStarted = false;
+let isGazeStarting = false;
 let latestGaze = null;
 let lastTrailTime = 0;
 let trailDots = [];
@@ -52,6 +53,10 @@ let webgazerPreviewPositionTimer = null;
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function syncToolbarHeight() {
@@ -207,15 +212,21 @@ function openPageFromInput() {
 async function startGazeTracking() {
   if (isGazeStarted) {
     setStatus("視線追跡はすでに開始しています。必要に応じて9点キャリブレーションを行ってください。");
-    return;
+    return true;
+  }
+
+  if (isGazeStarting) {
+    setStatus("WebGazerを起動中です。カメラ許可が出ている場合は許可してください。");
+    return true;
   }
 
   if (!window.webgazer) {
     setStatus("WebGazer.jsを読み込めませんでした。index.html と同じフォルダに webgazer.js があるか確認してください。");
-    return;
+    return false;
   }
 
   try {
+    isGazeStarting = true;
     setStatus("WebGazerを起動中です。ブラウザからカメラ許可を求められたら許可してください。");
 
     window.webgazer
@@ -226,7 +237,11 @@ async function startGazeTracking() {
         updateGaze(data.x, data.y);
       });
 
-    const beginResult = window.webgazer.begin();
+    const beginResult = window.webgazer.begin(() => {
+      isGazeStarted = false;
+      isGazeStarting = false;
+      setStatus("カメラを開始できませんでした。ブラウザのカメラ許可とHTTPS設定を確認してください。");
+    });
     window.webgazer.showVideoPreview(true);
     window.webgazer.showPredictionPoints(false);
     window.saveDataAcrossSessions = false;
@@ -235,6 +250,7 @@ async function startGazeTracking() {
     // カメラが起動しているのにキャリブレーションが押せない状態を避けるため、
     // begin() 呼び出し直後に開始済みとして扱います。
     isGazeStarted = true;
+    isGazeStarting = false;
     watchWebGazerPreviewPosition();
     setStatus("視線追跡を開始しました。次に「9点キャリブレーション」を押すと精度を調整できます。");
 
@@ -243,12 +259,17 @@ async function startGazeTracking() {
     }).catch((error) => {
       console.error(error);
       isGazeStarted = false;
+      isGazeStarting = false;
       setStatus("視線追跡を開始できませんでした。カメラ許可、HTTPS、ブラウザ設定を確認してください。");
     });
+
+    return true;
   } catch (error) {
     console.error(error);
     isGazeStarted = false;
+    isGazeStarting = false;
     setStatus("視線追跡を開始できませんでした。カメラ許可、HTTPS、ブラウザ設定を確認してください。");
+    return false;
   }
 }
 
@@ -283,25 +304,50 @@ function clearTrail() {
   setStatus("視線軌跡を消しました。");
 }
 
-function startCalibration() {
-  if (!isGazeStarted) {
-    setStatus("先に「視線追跡開始」を押して、カメラを許可してください。");
-    return;
+function hasWebGazerCameraPreview() {
+  const video = document.getElementById("webgazerVideoFeed");
+  return Boolean(video?.srcObject || video?.readyState > 0);
+}
+
+async function ensureGazeTrackingForCalibration() {
+  if (isGazeStarted || isGazeStarting || hasWebGazerCameraPreview()) {
+    return true;
   }
+
+  setStatus("キャリブレーションの前にWebGazerを起動します。カメラ許可が出たら許可してください。");
+  const started = await startGazeTracking();
+  if (!started) return false;
+
+  // WebGazerのクリック学習は現在フレームの目特徴量を使うため、起動直後に少し待ちます。
+  await sleep(300);
+  return true;
+}
+
+async function startCalibration() {
+  const canCalibrate = await ensureGazeTrackingForCalibration();
+  if (!canCalibrate) return;
 
   calibrationIndex = 0;
   calibrationClickCount = 0;
   calibrationLayer.hidden = false;
+  calibrationLayer.removeAttribute("hidden");
+  calibrationLayer.style.display = "block";
   moveCalibrationPoint();
-  setStatus("9点キャリブレーション中です。青い点を見ながらクリックしてください。");
+  setStatus(`9点キャリブレーション中です。青い点を見ながら、各点を${CALIBRATION_CLICKS_PER_POINT}回クリックしてください。`);
 }
 
 function moveCalibrationPoint() {
   const point = CALIBRATION_POSITIONS[calibrationIndex];
-  calibrationPoint.style.left = `${point.x}%`;
-  calibrationPoint.style.top = `${point.y}%`;
+  const toolbarHeight = Math.ceil(toolbar.getBoundingClientRect().height);
+  const footerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--footer-height"), 10) || 0;
+  const usableHeight = Math.max(window.innerHeight - toolbarHeight - footerHeight, 120);
+  const x = window.innerWidth * (point.x / 100);
+  const y = toolbarHeight + usableHeight * (point.y / 100);
+
+  calibrationPoint.style.left = `${x}px`;
+  calibrationPoint.style.top = `${y}px`;
   calibrationPoint.style.transform = "translate(-50%, -50%)";
-  calibrationProgress.textContent = `${calibrationIndex + 1} / ${CALIBRATION_POSITIONS.length}（${point.label}）`;
+  calibrationProgress.textContent = `${calibrationIndex + 1} / ${CALIBRATION_POSITIONS.length}（${point.label}・${calibrationClickCount + 1}/${CALIBRATION_CLICKS_PER_POINT}回目）`;
 }
 
 function handleCalibrationClick(event) {
@@ -317,7 +363,7 @@ function handleCalibrationClick(event) {
 
   calibrationClickCount += 1;
   if (calibrationClickCount < CALIBRATION_CLICKS_PER_POINT) {
-    calibrationProgress.textContent = `${calibrationIndex + 1} / ${CALIBRATION_POSITIONS.length}（あと ${CALIBRATION_CLICKS_PER_POINT - calibrationClickCount} 回クリック）`;
+    moveCalibrationPoint();
     return;
   }
 
@@ -326,6 +372,7 @@ function handleCalibrationClick(event) {
 
   if (calibrationIndex >= CALIBRATION_POSITIONS.length) {
     calibrationLayer.hidden = true;
+    calibrationLayer.style.display = "none";
     setStatus("キャリブレーション完了です。視線カーソルの動きを確認してください。");
     return;
   }
