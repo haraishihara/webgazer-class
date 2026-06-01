@@ -1,28 +1,10 @@
-# mediapipe/face_mesh
+# MediaPipe JavaScript Solutions
 
-WebGazer v3 の `TFFacemesh` トラッカーを完全ローカルで動かす場合は、MediaPipe FaceMesh の追加ファイルをこのフォルダに置きます。
+MediaPipe offers out of the box solutions to use our ML technology with live and streaming media.
 
-このリポジトリのPRではバイナリファイルを扱えないため、初期状態では実ファイルを同梱していません。既定の `script.js` は CDN を参照しますが、学校のネットワークなどでCDNが使えない場合は、このフォルダに以下のファイルをダウンロードしてください。
+Visit us as [mediapipe.dev]()
 
-ダウンロード元の例:
+See live demos of our JavaScript solutions at [code.mediapipe.dev/codepen]()
 
-`https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/<ファイル名>`
+For more information on each of the solutions and how to use them, visit https://google.github.io/mediapipe/getting_started/javascript.
 
-必要な主なファイル:
-
-- `face_mesh.binarypb`
-- `face_mesh_solution_packed_assets.data`
-- `face_mesh_solution_packed_assets_loader.js`
-- `face_mesh_solution_simd_wasm_bin.data`
-- `face_mesh_solution_simd_wasm_bin.js`
-- `face_mesh_solution_simd_wasm_bin.wasm`
-- `face_mesh_solution_wasm_bin.js`
-- `face_mesh_solution_wasm_bin.wasm`
-
-配置後、`script.js` の `MEDIAPIPE_FACE_MESH_SOLUTION_PATH` を次のように変更します。
-
-```js
-const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "./mediapipe/face_mesh";
-```
-
-`face_mesh.js` は WebGazer の TFFacemesh 経由では通常不要ですが、MediaPipe FaceMesh を単体で使う教材を追加する場合には同じ配布元から取得できます。

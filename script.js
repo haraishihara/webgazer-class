@@ -5,7 +5,8 @@ const WEBGAZER_PREVIEW_WIDTH = 320;
 const WEBGAZER_PREVIEW_HEIGHT = 240;
 // WebGazer v3 の TFFaceMesh は MediaPipe の追加ファイルを必要とします。
 // バイナリファイルをPRに含めないため、既定ではCDNから読み込みます。
-const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619";
+//const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619";
+const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = "./mediapipe/face_mesh";
 const MAX_TRAIL_POINTS = 300;
 const CALIBRATION_CLICKS_PER_POINT = 3;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
