@@ -16,7 +16,6 @@ const MEDIAPIPE_FACE_MESH_SOLUTION_PATH = getMediaPipeFaceMeshSolutionPath();
 const MAX_TRAIL_POINTS = 300;
 const CALIBRATION_CLICKS_PER_POINT = 3;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-const ACCEPTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 const CALIBRATION_POSITIONS = [
   { x: 10, y: 10, label: "左上" },
   { x: 50, y: 10, label: "上中央" },
@@ -39,14 +38,11 @@ const startGazeButton = document.getElementById("startGazeButton");
 const calibrationButton = document.getElementById("calibrationButton");
 const clearTrailButton = document.getElementById("clearTrailButton");
 const clearBackgroundButton = document.getElementById("clearBackgroundButton");
-const screenshotSelect = document.getElementById("screenshotSelect");
-const openScreenshotButton = document.getElementById("openScreenshotButton");
 const statusText = document.getElementById("statusText");
 const displayArea = document.getElementById("displayArea");
 const pageFrame = document.getElementById("pageFrame");
 const droppedImage = document.getElementById("droppedImage");
 const introPanel = document.getElementById("introPanel");
-const embedNotice = document.getElementById("embedNotice");
 const gazeCursor = document.getElementById("gazeCursor");
 const trailLayer = document.getElementById("trailLayer");
 const calibrationLayer = document.getElementById("calibrationLayer");
@@ -182,59 +178,6 @@ async function checkMediaPipeAssetsReachable() {
   }
 }
 
-function isAcceptedScreenshotPath(src) {
-  const lowerSrc = src.toLowerCase().split(/[?#]/)[0];
-  return ACCEPTED_IMAGE_EXTENSIONS.some((extension) => lowerSrc.endsWith(extension));
-}
-
-function getScreenshotEntries() {
-  if (!Array.isArray(window.SCREENSHOT_IMAGES)) return [];
-
-  return window.SCREENSHOT_IMAGES
-    .map((entry) => {
-      if (typeof entry === "string") {
-        return { label: entry.replace(/^screenshots\//, ""), src: entry };
-      }
-      return entry;
-    })
-    .filter((entry) => entry?.src && isAcceptedScreenshotPath(entry.src));
-}
-
-function populateScreenshotOptions() {
-  const screenshotEntries = getScreenshotEntries();
-  screenshotSelect.innerHTML = "";
-
-  const placeholderOption = document.createElement("option");
-  placeholderOption.value = "";
-  placeholderOption.textContent = screenshotEntries.length
-    ? "画像を選択してください"
-    : "screenshots/manifest.js に画像を登録";
-  screenshotSelect.appendChild(placeholderOption);
-
-  screenshotEntries.forEach((entry) => {
-    const option = document.createElement("option");
-    option.value = entry.src;
-    option.textContent = entry.label || entry.src.replace(/^screenshots\//, "");
-    screenshotSelect.appendChild(option);
-  });
-
-  const isEmpty = screenshotEntries.length === 0;
-  screenshotSelect.disabled = isEmpty;
-  openScreenshotButton.disabled = isEmpty;
-}
-
-function openSelectedScreenshot() {
-  const selectedOption = screenshotSelect.selectedOptions[0];
-  const src = selectedOption?.value;
-  if (!src) {
-    setStatus("screenshots フォルダの画像を使うには、screenshots/manifest.js に画像を登録してください。");
-    return;
-  }
-
-  showScreenshotImage(src, selectedOption.textContent);
-  setStatus("登録済み画像を表示しました。視線カーソルと軌跡を重ねて観察できます。");
-}
-
 function normalizeUrl(rawUrl) {
   const trimmedUrl = rawUrl.trim();
   if (!trimmedUrl) return "";
@@ -246,7 +189,6 @@ function showIntro() {
   introPanel.hidden = false;
   pageFrame.hidden = true;
   droppedImage.hidden = true;
-  embedNotice.hidden = true;
   pageFrame.removeAttribute("src");
   droppedImage.removeAttribute("src");
 
@@ -257,7 +199,6 @@ function showIframe(url) {
   introPanel.hidden = true;
   droppedImage.hidden = true;
   pageFrame.hidden = false;
-  embedNotice.hidden = false;
   pageFrame.src = url;
 
   clearDroppedImageObjectUrl();
@@ -276,7 +217,6 @@ function showImageSource(src, altText) {
   droppedImage.hidden = false;
   pageFrame.hidden = true;
   introPanel.hidden = true;
-  embedNotice.hidden = true;
   pageFrame.removeAttribute("src");
 }
 
@@ -284,11 +224,6 @@ function showImage(file) {
   clearDroppedImageObjectUrl();
   droppedImageUrl = URL.createObjectURL(file);
   showImageSource(droppedImageUrl, file.name || "ドラッグ＆ドロップされた画像");
-}
-
-function showScreenshotImage(src, label) {
-  clearDroppedImageObjectUrl();
-  showImageSource(src, label || "登録済みスクリーンショット画像");
 }
 
 function openPageFromInput() {
@@ -300,7 +235,7 @@ function openPageFromInput() {
 
   urlInput.value = normalizedUrl;
   showIframe(normalizedUrl);
-  setStatus("ページをiframeで開きました。表示されない場合は、スクリーンショット画像をドラッグ＆ドロップしてください。");
+  setStatus("ページをiframeで開きました。表示されない場合は、画像をドラッグ＆ドロップしてください。");
 }
 
 async function startGazeTracking() {
@@ -508,7 +443,7 @@ function handleDrop(event) {
 }
 
 droppedImage.addEventListener("error", () => {
-  setStatus("画像を読み込めませんでした。screenshots/manifest.js のパス、またはドロップした画像ファイルを確認してください。");
+  setStatus("画像を読み込めませんでした。ドロップした画像ファイルを確認してください。");
 });
 
 openPageButton.addEventListener("click", openPageFromInput);
@@ -518,10 +453,6 @@ urlInput.addEventListener("keydown", (event) => {
 startGazeButton.addEventListener("click", startGazeTracking);
 calibrationButton.addEventListener("click", startCalibration);
 clearTrailButton.addEventListener("click", clearTrail);
-openScreenshotButton.addEventListener("click", openSelectedScreenshot);
-screenshotSelect.addEventListener("change", () => {
-  if (screenshotSelect.value) openSelectedScreenshot();
-});
 clearBackgroundButton.addEventListener("click", () => {
   showIntro();
   setStatus("背景をクリアしました。URLを開くか、画像をドラッグ＆ドロップしてください。");
@@ -545,7 +476,6 @@ if (window.webgazer?.params) {
   configureWebGazerMediaPipeAssets();
 }
 syncToolbarHeight();
-populateScreenshotOptions();
 showIntro();
 updateStartGazeButtonState();
 window.addEventListener("resize", syncToolbarHeight);
