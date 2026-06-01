@@ -43,6 +43,8 @@ const displayArea = document.getElementById("displayArea");
 const pageFrame = document.getElementById("pageFrame");
 const droppedImage = document.getElementById("droppedImage");
 const introPanel = document.getElementById("introPanel");
+const embedNotice = document.getElementById("embedNotice");
+const closeEmbedNoticeButton = document.getElementById("closeEmbedNoticeButton");
 const gazeCursor = document.getElementById("gazeCursor");
 const trailLayer = document.getElementById("trailLayer");
 const calibrationLayer = document.getElementById("calibrationLayer");
@@ -60,6 +62,7 @@ let calibrationClickCount = 0;
 let droppedImageUrl = null;
 let webgazerPreviewPositionTimer = null;
 let gazePredictionPollTimer = null;
+let isEmbedNoticeDismissed = sessionStorage.getItem("embedNoticeDismissed") === "1";
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -178,6 +181,22 @@ async function checkMediaPipeAssetsReachable() {
   }
 }
 
+function hideEmbedNotice() {
+  if (!embedNotice) return;
+  embedNotice.hidden = true;
+}
+
+function dismissEmbedNotice() {
+  isEmbedNoticeDismissed = true;
+  sessionStorage.setItem("embedNoticeDismissed", "1");
+  hideEmbedNotice();
+}
+
+function showEmbedNoticeIfAllowed() {
+  if (!embedNotice || isEmbedNoticeDismissed) return;
+  embedNotice.hidden = false;
+}
+
 function normalizeUrl(rawUrl) {
   const trimmedUrl = rawUrl.trim();
   if (!trimmedUrl) return "";
@@ -189,6 +208,7 @@ function showIntro() {
   introPanel.hidden = false;
   pageFrame.hidden = true;
   droppedImage.hidden = true;
+  hideEmbedNotice();
   pageFrame.removeAttribute("src");
   droppedImage.removeAttribute("src");
 
@@ -200,6 +220,7 @@ function showIframe(url) {
   droppedImage.hidden = true;
   pageFrame.hidden = false;
   pageFrame.src = url;
+  showEmbedNoticeIfAllowed();
 
   clearDroppedImageObjectUrl();
 }
@@ -217,6 +238,7 @@ function showImageSource(src, altText) {
   droppedImage.hidden = false;
   pageFrame.hidden = true;
   introPanel.hidden = true;
+  hideEmbedNotice();
   pageFrame.removeAttribute("src");
 }
 
@@ -445,6 +467,8 @@ function handleDrop(event) {
 droppedImage.addEventListener("error", () => {
   setStatus("画像を読み込めませんでした。ドロップした画像ファイルを確認してください。");
 });
+
+closeEmbedNoticeButton?.addEventListener("click", dismissEmbedNotice);
 
 openPageButton.addEventListener("click", openPageFromInput);
 urlInput.addEventListener("keydown", (event) => {
