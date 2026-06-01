@@ -2,7 +2,6 @@
   --toolbar-min-height: 112px;
   --toolbar-height: 112px;
   --webgazer-preview-offset: 16px;
-  --footer-height: 52px;
   --accent: #0f62fe;
   --danger: #e31b23;
   --panel: rgba(255, 255, 255, 0.94);
@@ -160,7 +159,7 @@ button:active:not(:disabled) {
 
 .display-area {
   position: fixed;
-  inset: var(--toolbar-height) 0 var(--footer-height) 0;
+  inset: var(--toolbar-height) 0 0 0;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -309,10 +308,10 @@ button:active:not(:disabled) {
 .gaze-cursor {
   position: fixed;
   z-index: 2500;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  border: 3px solid #fff;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border: 1.5px solid #fff;
   border-radius: 50%;
   background: var(--danger);
   box-shadow: 0 0 14px rgba(0, 0, 0, 0.35), 0 0 18px rgba(227, 27, 35, 0.45);
@@ -335,9 +334,9 @@ button:active:not(:disabled) {
 
 .trail-dot {
   position: fixed;
-  width: 30px;
-  height: 30px;
-  margin: -15px 0 0 -15px;
+  width: 15px;
+  height: 15px;
+  margin: -7.5px 0 0 -7.5px;
   border-radius: 50%;
   background: rgba(227, 27, 35, 0.28);
   pointer-events: none;
@@ -377,25 +376,10 @@ button:active:not(:disabled) {
   box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.28), 0 8px 26px rgba(0, 0, 0, 0.32);
 }
 
-.bottom-notice {
-  position: fixed;
-  inset: auto 0 0 0;
-  z-index: 1000;
-  min-height: var(--footer-height);
-  padding: 8px 18px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #334155;
-  font-size: 0.86rem;
-  line-height: 1.45;
-  text-align: center;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.10);
-}
-
 @media (max-width: 900px) {
   :root {
     --toolbar-min-height: 184px;
     --toolbar-height: 184px;
-    --footer-height: 70px;
   }
 
   body {

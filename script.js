@@ -392,8 +392,7 @@ async function startCalibration() {
 function moveCalibrationPoint() {
   const point = CALIBRATION_POSITIONS[calibrationIndex];
   const toolbarHeight = Math.ceil(toolbar.getBoundingClientRect().height);
-  const footerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--footer-height"), 10) || 0;
-  const usableHeight = Math.max(window.innerHeight - toolbarHeight - footerHeight, 120);
+  const usableHeight = Math.max(window.innerHeight - toolbarHeight, 120);
   const x = window.innerWidth * (point.x / 100);
   const y = toolbarHeight + usableHeight * (point.y / 100);
 
