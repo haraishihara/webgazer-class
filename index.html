@@ -2,10 +2,89 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>WebGazer Class</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGazer 視線追跡体験</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // WebGazer にセッションをまたいだ学習データ保存をさせないため、ローカル版読み込み前に指定します。
+    window.saveDataAcrossSessions = false;
+  </script>
+  <script src="webgazer.js"></script>
 </head>
 <body>
-  <h1>WebGazer Class</h1>
-  <p>準備中です。</p>
+  <header id="toolbar" class="toolbar" aria-label="操作ツールバー">
+    <div class="toolbar-row toolbar-row-main">
+      <label class="url-label" for="urlInput">URL</label>
+      <input id="urlInput" class="url-input" type="text" value="https://example.com" placeholder="https://example.com" autocomplete="off">
+      <button id="openPageButton" type="button">ページを開く</button>
+      <button id="startGazeButton" type="button">視線追跡開始</button>
+      <button id="calibrationButton" type="button">9点キャリブレーション</button>
+      <button id="clearTrailButton" type="button">軌跡を消す</button>
+      <button id="clearBackgroundButton" type="button">背景をクリア</button>
+    </div>
+    <div class="toolbar-row toolbar-row-sub">
+      <div class="toolbar-tools">
+        <div class="sample-buttons" aria-label="サンプルページ">
+          <span>サンプル:</span>
+          <button class="sample-button" type="button" data-url="https://example.com">Example</button>
+          <button class="sample-button" type="button" data-url="https://www.wikipedia.org/">Wikipedia</button>
+        </div>
+        <div class="screenshot-picker" aria-label="スクリーンショット画像選択">
+          <label for="screenshotSelect">画像:</label>
+          <select id="screenshotSelect" class="screenshot-select">
+            <option value="">screenshots/manifest.js に画像を登録</option>
+          </select>
+          <button id="openScreenshotButton" class="secondary-button" type="button">画像を表示</button>
+        </div>
+      </div>
+      <p id="statusText" class="status-text" role="status" aria-live="polite">準備完了です。まず「視線追跡開始」を押してください。</p>
+    </div>
+  </header>
+
+  <main id="displayArea" class="display-area" aria-label="Webページまたは画像の表示領域">
+    <iframe id="pageFrame" class="page-frame" title="入力したURLの表示" hidden></iframe>
+    <img id="droppedImage" class="dropped-image" alt="ドラッグ＆ドロップされた画像" hidden>
+
+    <section id="introPanel" class="intro-panel">
+      <h1>WebGazer 視線追跡体験</h1>
+      <ol>
+        <li>「視線追跡開始」を押して、カメラを許可してください。</li>
+        <li>「9点キャリブレーション」を押して、青い点を見ながら各点を数回クリックしてください。</li>
+        <li>URLを入力してWebページを開くか、登録済み画像を選ぶか、画像をドラッグ＆ドロップしてください。</li>
+        <li>赤い丸と赤い軌跡が、自分の視線の推定位置です。</li>
+      </ol>
+      <p>※これは授業用の簡易デモです。研究用アイトラッカーほど正確ではありません。</p>
+      <p>※視線＝注意、視線＝操作意図とは限らない点も観察してみましょう。</p>
+      <p class="drop-hint">PNG / JPG / JPEG / WebP / GIF 画像をこの領域にドラッグ＆ドロップできます。<br>また、<code>screenshots</code> フォルダに登録した画像は、上部の「画像」メニューから選択できます。</p>
+      <p class="setup-note">配布時は、この <code>index.html</code> と同じフォルダに、別途用意した <code>webgazer.js</code> を置いてください。</p>
+      <p class="privacy-note">カメラ映像はWebGazerによるブラウザ内処理に使用されます。<br>この授業用ページでは、視線データやカメラ映像をサーバーに送信・保存しません。</p>
+    </section>
+
+    <aside id="embedNotice" class="embed-notice" hidden>
+      このWebページは埋め込み表示できない可能性があります。<br>
+      別のURLを試すか、Webページのスクリーンショット画像をドラッグ＆ドロップしてください。
+    </aside>
+
+    <div id="dropOverlay" class="drop-overlay" aria-hidden="true">画像をここにドロップ</div>
+  </main>
+
+  <div id="gazeCursor" class="gaze-cursor" aria-hidden="true"></div>
+  <div id="trailLayer" class="trail-layer" aria-hidden="true"></div>
+
+  <div id="calibrationLayer" class="calibration-layer" hidden>
+    <div class="calibration-message">
+      青い点を見ながらクリックしてください。<br>
+      <span id="calibrationProgress">1 / 9</span>
+    </div>
+    <button id="calibrationPoint" class="calibration-point" type="button" aria-label="キャリブレーション点"></button>
+  </div>
+
+  <footer class="bottom-notice">
+    Webカメラによる簡易推定のため、照明・姿勢・メガネ・前髪・カメラ位置によって大きくズレることがあります。<br>
+    埋め込み表示できないWebページは、スクリーンショット画像をドラッグ＆ドロップしてください。
+  </footer>
+
+  <script src="screenshots/manifest.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
